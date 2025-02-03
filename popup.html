@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Broadcaster</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+    
+    body {
+      width: 400px;
+      padding: 10px;
+      font-family: 'Roboto', sans-serif;
+      background-color: #121212;
+      color: white;
+    }
+    
+    .tab-button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      cursor: pointer;
+      background: #282828;
+      border: none;
+      text-align: left;
+      color: white;
+      font-size: 14px;
+      border-radius: 5px;
+      transition: background 0.2s;
+    }
+
+    .tab-button:hover {
+      background: #333;
+    }
+
+    #waveform {
+      width: 100%;
+      height: 150px;
+      margin-top: 10px;
+      background: #1a1a1a;
+    }
+
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    button {
+      padding: 8px 16px;
+      background: #1db954;
+      border: none;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background: #17a74a;
+    }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎵 Music Broadcaster</h2>
+  <div id="tabs-list"></div>
+  <canvas id="waveform"></canvas>
+  <div class="controls">
+    <button id="playPauseBtn">⏯️ Play/Pause</button>
+    <button id="stopBtn">⏹ Stop</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
