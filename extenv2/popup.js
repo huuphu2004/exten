@@ -3,7 +3,8 @@ let audioContext = null;
 let source = null;
 let analyser = null;
 let isPlaying = false;
-let pipWindow = null;
+let pipVideo = null;
+let isPiPActive = false;
 
 const canvas = document.getElementById('waveform');
 const ctx = canvas.getContext('2d');
@@ -13,7 +14,7 @@ canvas.height = canvas.offsetHeight;
 document.addEventListener('DOMContentLoaded', loadTabs);
 window.addEventListener('focus', loadTabs);
 
-document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+document.getElementById('startBtn').addEventListener('click', togglePlay);
 document.getElementById('stopBtn').addEventListener('click', stopAudio);
 document.getElementById('pipBtn').addEventListener('click', togglePiP);
 
@@ -56,8 +57,9 @@ async function selectTab(tab) {
     currentTabId = tab.id;
     setupAudio(stream);
     isPlaying = true;
+
+    // Không reset canvas khi chuyển tab
     drawBars();
-    activatePiP(); // Kích hoạt PiP khi capture thành công
 
   } catch (error) {
     console.error("Lỗi capture:", error);
@@ -66,6 +68,9 @@ async function selectTab(tab) {
 }
 
 function setupAudio(stream) {
+  if (audioContext) {
+    audioContext.close(); // Đóng AudioContext cũ nếu tồn tại
+  }
   audioContext = new AudioContext();
   source = audioContext.createMediaStreamSource(stream);
   analyser = audioContext.createAnalyser();
@@ -87,17 +92,16 @@ function togglePlay() {
 }
 
 async function stopAudio() {
-  if (currentTabId) {
-    await chrome.tabs.update(currentTabId, { muted: false });
-    currentTabId = null;
-  }
-  if (audioContext) {
-    audioContext.close();
-    audioContext = null;
-  }
-  isPlaying = false;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  deactivatePiP();
+  // if (currentTabId) {
+  //   await chrome.tabs.update(currentTabId, { muted: false });
+  //   currentTabId = null;
+  // }
+  // if (audioContext) {
+  //   audioContext.close();
+  //   audioContext = null;
+  // }
+  // isPlaying = false;
+  // Không xóa canvas khi dừng audio
 }
 
 function drawBars() {
@@ -110,8 +114,10 @@ function drawBars() {
   const dataArray = new Uint8Array(bufferLength);
   analyser.getByteFrequencyData(dataArray);
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
+  // Không xóa toàn bộ canvas, chỉ vẽ đè lên
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'; // Tạo hiệu ứng mờ dần
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   const barWidth = (canvas.width / bufferLength) * 2.5;
   let x = 0;
 
@@ -127,37 +133,44 @@ function drawBars() {
   requestAnimationFrame(drawBars);
 }
 
-// 📌 Tích hợp Picture-in-Picture (PiP)
-function activatePiP() {
-  if (!document.pictureInPictureEnabled) {
-    console.warn("Trình duyệt không hỗ trợ Picture-in-Picture!");
-    return;
-  }
-
-  if (pipWindow) return; // Nếu PiP đã bật, bỏ qua
-
-  canvas.requestPictureInPicture()
-    .then(window => {
-      pipWindow = window;
-      window.addEventListener('leavepictureinpicture', () => {
-        pipWindow = null;
+// 📌 Tích hợp Picture-in-Picture (PiP) cho canvas
+async function togglePiP() {
+  try {
+    if (isPiPActive) {
+      await document.exitPictureInPicture();
+      if (pipVideo) {
+        pipVideo.remove();
+        pipVideo = null;
+      }
+      isPiPActive = false;
+    } else {
+      if (!pipVideo) {
+        pipVideo = document.createElement('video');
+        pipVideo.muted = true; // Tắt âm thanh vì stream chỉ có hình ảnh
+        pipVideo.srcObject = canvas.captureStream(60); // Lấy stream từ canvas
+      }
+      
+      // Kích hoạt PiP khi video đã sẵn sàng
+      pipVideo.addEventListener('loadedmetadata', async () => {
+        try {
+          await pipVideo.play();
+          await pipVideo.requestPictureInPicture();
+          isPiPActive = true; // Đánh dấu PiP đang hoạt động
+        } catch (error) {
+          console.error("Lỗi PiP:", error);
+        }
       });
-    })
-    .catch(error => console.error("Lỗi PiP:", error));
-}
-
-function deactivatePiP() {
-  if (document.pictureInPictureElement) {
-    document.exitPictureInPicture();
-    pipWindow = null;
+    }
+  } catch (error) {
+    console.error("Lỗi PiP:", error);
   }
 }
 
-// 📌 Nút bật/tắt PiP
-function togglePiP() {
-  if (pipWindow) {
-    deactivatePiP();
-  } else {
-    activatePiP();
+// Giữ PiP hoạt động khi extension bị tắt (Hoạt động độc lập với việc đóng extension)
+chrome.runtime.onSuspend.addListener(() => {
+  // Đảm bảo PiP vẫn hoạt động ngay cả khi extension không còn hoạt động
+  if (isPiPActive && pipVideo) {
+    pipVideo.play(); // Tiếp tục phát video
+    pipVideo.requestPictureInPicture(); // Yêu cầu PiP nếu chưa có
   }
-}
+});
